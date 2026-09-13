@@ -1,0 +1,41 @@
+name: Deploy to SmarterASP.NET (Web Deploy)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'BlazorServerApp/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        working-directory: ./BlazorServerApp
+        run: dotnet restore
+
+      - name: Build and deploy via Web Deploy
+        working-directory: ./BlazorServerApp
+        run: >
+          dotnet build -c Release
+          -p:DeployOnBuild=true
+          -p:WebPublishMethod=MSDeploy
+          -p:MSDeployPublishMethod=WMSVC
+          -p:MSDeployServiceURL=${{ secrets.DEPLOY_SERVICE_URL }}
+          -p:DeployIisAppPath=${{ secrets.DEPLOY_SITE_NAME }}
+          -p:UserName=${{ secrets.DEPLOY_USERNAME }}
+          -p:Password=${{ secrets.DEPLOY_PASSWORD }}
+          -p:AllowUntrustedCertificate=true
+          -p:EnableMSDeployBackup=false
+          -p:SkipExtraFilesOnServer=false
