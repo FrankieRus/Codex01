@@ -141,7 +141,7 @@ else
                 await stream.CopyToAsync(fileStream);
             }
 
-            PdfStore.Add(fileToUpload.Name, storedFileName, descriptionToSave);
+            var newId = PdfStore.Add(fileToUpload.Name, storedFileName, descriptionToSave);
 
             if (ReferenceEquals(selectedFile, fileToUpload))
             {
@@ -154,6 +154,12 @@ else
             }
 
             documents = PdfStore.Search(searchQuery);
+
+            var uploaded = documents.FirstOrDefault(d => d.Id == newId);
+            if (uploaded is not null)
+            {
+                Select(uploaded);
+            }
         }
         catch (Exception ex)
         {
