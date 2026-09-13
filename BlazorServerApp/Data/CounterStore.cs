@@ -4,12 +4,15 @@ namespace BlazorServerApp.Data;
 
 /// <summary>
 /// A single counter value shared by all users, persisted in a SQLite file
-/// under App_Data so it survives app restarts and redeploys.
+/// under App_Data so it survives app restarts and redeploys. Raises
+/// <see cref="OnCounterChanged"/> so every connected page can update live.
 /// </summary>
 public class CounterStore
 {
     private readonly string _connectionString;
     private readonly object _lock = new();
+
+    public event Action<int>? OnCounterChanged;
 
     public CounterStore(IWebHostEnvironment env)
     {
@@ -61,6 +64,7 @@ public class CounterStore
             var value = Convert.ToInt32(select.ExecuteScalar());
 
             transaction.Commit();
+            OnCounterChanged?.Invoke(value);
             return value;
         }
     }
