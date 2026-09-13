@@ -1,9 +1,149 @@
 @page "/website/site1"
+@rendermode InteractiveServer
+@using BlazorServerApp.Data
+@inject PdfDocumentStore PdfStore
+@inject IWebHostEnvironment Env
 
-<PageTitle>Site 1</PageTitle>
+<PageTitle>PDF Library</PageTitle>
 
-<h1>Site 1</h1>
+<h1>PDF Library</h1>
+<a href="website" class="btn btn-secondary btn-sm mb-3">Back to Website</a>
 
-<p>This is a placeholder for Site 1.</p>
+<div class="row">
+    <div class="col-md-5">
+        <h5>Upload a PDF</h5>
+        <div class="mb-2">
+            <InputFile OnChange="OnFileSelected" accept=".pdf" class="form-control" />
+        </div>
+        <div class="mb-2">
+            <input class="form-control" placeholder="Description"
+                   value="@description" @oninput="e => description = e.Value?.ToString() ?? string.Empty" />
+        </div>
+        <button class="btn btn-primary" @onclick="UploadAsync" disabled="@(selectedFile is null || uploading)">
+            @(uploading ? "Uploading..." : "Upload")
+        </button>
+        @if (!string.IsNullOrEmpty(uploadError))
+        {
+            <div class="text-danger mt-2">@uploadError</div>
+        }
 
-<a href="website" class="btn btn-secondary">Back to Website</a>
+        <hr />
+
+        <h5>Search</h5>
+        <input class="form-control mb-2" placeholder="Search description or filename..."
+               value="@searchQuery" @oninput="OnSearch" />
+
+        <ul class="list-group">
+            @foreach (var doc in documents)
+            {
+                <li class="list-group-item @(selected?.Id == doc.Id ? "active" : "")" style="cursor:pointer"
+                    @onclick="() => Select(doc)">
+                    <strong>@doc.Description</strong><br />
+                    <small>@doc.FileName &mdash; @doc.UploadedAt UTC</small>
+                </li>
+            }
+            @if (documents.Count == 0)
+            {
+                <li class="list-group-item text-muted">No PDFs found.</li>
+            }
+        </ul>
+    </div>
+
+    <div class="col-md-7">
+        @if (selected is not null)
+        {
+            <h5>@selected.Description</h5>
+            <iframe title="@selected.Description" src="@GetPdfUrl(selected)" style="width:100%; height:80vh; border:1px solid #ccc;"></iframe>
+        }
+        else
+        {
+            <p class="text-muted">Select a PDF from the list to view it here.</p>
+        }
+    </div>
+</div>
+
+@code {
+    private const long MaxFileSize = 50 * 1024 * 1024; // 50 MB
+
+    private IBrowserFile? selectedFile;
+    private string description = string.Empty;
+    private string searchQuery = string.Empty;
+    private string? uploadError;
+    private bool uploading;
+    private List<PdfRecord> documents = new();
+    private PdfRecord? selected;
+
+    protected override void OnInitialized()
+    {
+        documents = PdfStore.Search(searchQuery);
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        uploadError = null;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (selectedFile is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            uploadError = "Please enter a description.";
+            return;
+        }
+
+        if (!selectedFile.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            uploadError = "Only PDF files are allowed.";
+            return;
+        }
+
+        uploading = true;
+        uploadError = null;
+        try
+        {
+            var uploadsDir = Path.Combine(Env.WebRootPath, "uploads", "pdfs");
+            Directory.CreateDirectory(uploadsDir);
+            var storedFileName = $"{Guid.NewGuid()}.pdf";
+            var destPath = Path.Combine(uploadsDir, storedFileName);
+
+            await using (var stream = selectedFile.OpenReadStream(MaxFileSize))
+            await using (var fileStream = File.Create(destPath))
+            {
+                await stream.CopyToAsync(fileStream);
+            }
+
+            PdfStore.Add(selectedFile.Name, storedFileName, description.Trim());
+
+            description = string.Empty;
+            selectedFile = null;
+            documents = PdfStore.Search(searchQuery);
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            uploading = false;
+        }
+    }
+
+    private void OnSearch(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? string.Empty;
+        documents = PdfStore.Search(searchQuery);
+    }
+
+    private void Select(PdfRecord doc)
+    {
+        selected = doc;
+    }
+
+    private static string GetPdfUrl(PdfRecord doc) => $"/uploads/pdfs/{doc.StoredFileName}";
+}
