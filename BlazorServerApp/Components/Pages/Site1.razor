@@ -1,9 +1,11 @@
 @page "/website/site1"
 @implements IDisposable
+@using System.Text
 @using BlazorServerApp.Data
 @inject PdfDocumentStore PdfStore
 @inject IWebHostEnvironment Env
 @inject LayoutState LayoutState
+@inject ILogger<Site1> Logger
 
 <PageTitle>PDF Library</PageTitle>
 
@@ -22,10 +24,12 @@ else
         <div class="col-md-5">
             <h5>Upload a PDF</h5>
             <div class="mb-2">
-                <InputFile OnChange="OnFileSelected" accept=".pdf" class="form-control" />
+                <label for="pdfFile" class="form-label">PDF file</label>
+                <InputFile id="pdfFile" OnChange="OnFileSelected" accept=".pdf" class="form-control" />
             </div>
             <div class="mb-2">
-                <input class="form-control" placeholder="Description"
+                <label for="pdfDescription" class="form-label">Description</label>
+                <input id="pdfDescription" class="form-control" placeholder="Description"
                        value="@description" @oninput="e => description = e.Value?.ToString() ?? string.Empty" />
             </div>
             <button class="btn btn-primary" @onclick="UploadAsync" disabled="@(selectedFile is null || uploading)">
@@ -39,28 +43,31 @@ else
             <hr />
 
             <h5>Search</h5>
-            <input class="form-control mb-2" placeholder="Search description or filename..."
+            <label for="pdfSearch" class="form-label visually-hidden">Search description or filename</label>
+            <input id="pdfSearch" class="form-control mb-2" placeholder="Search description or filename..."
                    value="@searchQuery" @oninput="OnSearch" />
 
-            <ul class="list-group">
+            <div class="list-group">
                 @foreach (var doc in documents)
                 {
-                    <li class="list-group-item" style="cursor:pointer" @onclick="() => Select(doc)">
+                    <button type="button" class="list-group-item list-group-item-action" @onclick="() => Select(doc)">
                         <strong>@doc.Description</strong><br />
                         <small>@doc.FileName &mdash; @doc.UploadedAt UTC</small>
-                    </li>
+                    </button>
                 }
                 @if (documents.Count == 0)
                 {
-                    <li class="list-group-item text-muted">No PDFs found.</li>
+                    <div class="list-group-item text-muted">No PDFs found.</div>
                 }
-            </ul>
+            </div>
         </div>
     </div>
 }
 
 @code {
-    private const long MaxFileSize = 50 * 1024 * 1024; // 50 MB
+    private const long MaxFileSize = 50 * 1024 * 1024; // 50 MB per file
+    private const long MaxTotalStorage = 500 * 1024 * 1024; // 500 MB total across all uploads
+    private static readonly byte[] PdfSignature = Encoding.ASCII.GetBytes("%PDF-");
 
     private IBrowserFile? selectedFile;
     private string description = string.Empty;
@@ -83,52 +90,96 @@ else
 
     private async Task UploadAsync()
     {
-        if (selectedFile is null)
+        var fileToUpload = selectedFile;
+        var descriptionToSave = description.Trim();
+
+        if (fileToUpload is null)
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(description))
+        if (string.IsNullOrWhiteSpace(descriptionToSave))
         {
             uploadError = "Please enter a description.";
             return;
         }
 
-        if (!selectedFile.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        if (!fileToUpload.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
         {
             uploadError = "Only PDF files are allowed.";
             return;
         }
 
+        if (GetUploadsDirSize() + fileToUpload.Size > MaxTotalStorage)
+        {
+            uploadError = "Storage limit reached. Please remove old PDFs before uploading more.";
+            return;
+        }
+
         uploading = true;
         uploadError = null;
+
+        var uploadsDir = Path.Combine(Env.WebRootPath, "uploads", "pdfs");
+        Directory.CreateDirectory(uploadsDir);
+        var storedFileName = $"{Guid.NewGuid()}.pdf";
+        var destPath = Path.Combine(uploadsDir, storedFileName);
+
         try
         {
-            var uploadsDir = Path.Combine(Env.WebRootPath, "uploads", "pdfs");
-            Directory.CreateDirectory(uploadsDir);
-            var storedFileName = $"{Guid.NewGuid()}.pdf";
-            var destPath = Path.Combine(uploadsDir, storedFileName);
-
-            await using (var stream = selectedFile.OpenReadStream(MaxFileSize))
+            await using (var stream = fileToUpload.OpenReadStream(MaxFileSize))
             await using (var fileStream = File.Create(destPath))
             {
+                var header = new byte[PdfSignature.Length];
+                var read = await stream.ReadAsync(header.AsMemory());
+                if (read < PdfSignature.Length || !header.AsSpan(0, read).SequenceEqual(PdfSignature))
+                {
+                    uploadError = "The selected file is not a valid PDF.";
+                    return;
+                }
+
+                await fileStream.WriteAsync(header.AsMemory(0, read));
                 await stream.CopyToAsync(fileStream);
             }
 
-            PdfStore.Add(selectedFile.Name, storedFileName, description.Trim());
+            PdfStore.Add(fileToUpload.Name, storedFileName, descriptionToSave);
 
-            description = string.Empty;
-            selectedFile = null;
+            if (ReferenceEquals(selectedFile, fileToUpload))
+            {
+                selectedFile = null;
+            }
+
+            if (description.Trim() == descriptionToSave)
+            {
+                description = string.Empty;
+            }
+
             documents = PdfStore.Search(searchQuery);
         }
         catch (Exception ex)
         {
-            uploadError = $"Upload failed: {ex.Message}";
+            Logger.LogError(ex, "Failed to upload PDF {FileName}", fileToUpload.Name);
+            uploadError = "Upload failed. Please try again.";
         }
         finally
         {
+            if (!string.IsNullOrEmpty(uploadError) && File.Exists(destPath))
+            {
+                File.Delete(destPath);
+            }
+
             uploading = false;
         }
+    }
+
+    private long GetUploadsDirSize()
+    {
+        var uploadsDir = Path.Combine(Env.WebRootPath, "uploads", "pdfs");
+        if (!Directory.Exists(uploadsDir))
+        {
+            return 0;
+        }
+
+        return new DirectoryInfo(uploadsDir).EnumerateFiles().Sum(f => f.Length);
     }
 
     private void OnSearch(ChangeEventArgs e)
