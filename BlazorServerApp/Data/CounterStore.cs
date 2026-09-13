@@ -16,9 +16,7 @@ public class CounterStore
 
     public CounterStore(IWebHostEnvironment env)
     {
-        var dataDir = Path.Combine(env.ContentRootPath, "App_Data");
-        Directory.CreateDirectory(dataDir);
-        _connectionString = $"Data Source={Path.Combine(dataDir, "counter.db")}";
+        _connectionString = AppDatabase.GetConnectionString(env);
 
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();

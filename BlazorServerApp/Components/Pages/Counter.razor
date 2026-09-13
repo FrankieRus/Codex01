@@ -3,6 +3,7 @@
 @implements IDisposable
 @using BlazorServerApp.Data
 @inject CounterStore CounterStore
+@inject MemoStore MemoStore
 
 <PageTitle>Counter</PageTitle>
 
@@ -12,13 +13,23 @@
 
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
 
+<div class="mt-4">
+    <label for="memo" class="form-label">Memo</label>
+    <textarea id="memo" class="form-control" rows="4" style="max-width: 500px;"
+              value="@memoText" @oninput="OnMemoInput"></textarea>
+</div>
+
 @code {
     private int currentCount;
+    private string memoText = "";
 
     protected override void OnInitialized()
     {
         currentCount = CounterStore.GetValue();
         CounterStore.OnCounterChanged += HandleCounterChanged;
+
+        memoText = MemoStore.GetValue();
+        MemoStore.OnMemoChanged += HandleMemoChanged;
     }
 
     private void HandleCounterChanged(int newValue)
@@ -30,13 +41,29 @@
         });
     }
 
+    private void HandleMemoChanged(string newText)
+    {
+        InvokeAsync(() =>
+        {
+            memoText = newText;
+            StateHasChanged();
+        });
+    }
+
     private void IncrementCount()
     {
         CounterStore.Increment();
     }
 
+    private void OnMemoInput(ChangeEventArgs e)
+    {
+        memoText = e.Value?.ToString() ?? "";
+        MemoStore.SetValue(memoText);
+    }
+
     public void Dispose()
     {
         CounterStore.OnCounterChanged -= HandleCounterChanged;
+        MemoStore.OnMemoChanged -= HandleMemoChanged;
     }
 }
