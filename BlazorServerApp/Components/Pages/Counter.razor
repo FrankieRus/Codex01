@@ -1,6 +1,7 @@
-﻿@page "/counter"
+@page "/counter"
 @rendermode InteractiveServer
-@inject IJSRuntime JS
+@using BlazorServerApp.Data
+@inject CounterStore CounterStore
 
 <PageTitle>Counter</PageTitle>
 
@@ -11,25 +12,15 @@
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
 
 @code {
-    private const string StorageKey = "counter-value";
-    private int currentCount = 0;
+    private int currentCount;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        if (firstRender)
-        {
-            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-            if (int.TryParse(stored, out var value))
-            {
-                currentCount = value;
-                StateHasChanged();
-            }
-        }
+        currentCount = CounterStore.GetValue();
     }
 
-    private async Task IncrementCount()
+    private void IncrementCount()
     {
-        currentCount++;
-        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, currentCount.ToString());
+        currentCount = CounterStore.Increment();
     }
 }

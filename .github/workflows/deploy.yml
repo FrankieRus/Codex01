@@ -38,4 +38,4 @@ jobs:
           -p:Password=${{ secrets.DEPLOY_PASSWORD }}
           -p:AllowUntrustedCertificate=true
           -p:EnableMSDeployBackup=false
-          -p:SkipExtraFilesOnServer=false
+          -p:SkipExtraFilesOnServer=true

@@ -185,6 +185,9 @@ DocProject/Help/html
 # Click-Once directory
 publish/
 
+# Local SQLite data (per-environment, not part of source)
+App_Data/
+
 # Publish Web Output
 *.[Pp]ublish.xml
 *.azurePubxml
