@@ -32,8 +32,12 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
+staticFileContentTypeProvider.Mappings[".ftl"] = "text/plain"; // pdf.js viewer localization files
+
 app.UseStaticFiles(new StaticFileOptions
 {
+    ContentTypeProvider = staticFileContentTypeProvider,
     // Force PDFs to render inline (e.g. in our <iframe> viewer) instead of
     // some browsers showing a "click to open" placeholder or downloading them.
     OnPrepareResponse = ctx =>
