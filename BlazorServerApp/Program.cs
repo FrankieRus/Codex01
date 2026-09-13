@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddSingleton<CounterStore>();
+builder.Services.AddSingleton<MemoStore>();
 
 var app = builder.Build();
 
