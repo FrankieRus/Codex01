@@ -155,7 +155,7 @@ else
 
             documents = PdfStore.Search(searchQuery);
 
-            var uploaded = documents.FirstOrDefault(d => d.Id == newId);
+            var uploaded = PdfStore.GetById(newId);
             if (uploaded is not null)
             {
                 Select(uploaded);

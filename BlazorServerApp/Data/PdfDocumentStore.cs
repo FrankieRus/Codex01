@@ -53,6 +53,31 @@ public class PdfDocumentStore
         }
     }
 
+    public PdfRecord? GetById(int id)
+    {
+        lock (_lock)
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
+            var command = connection.CreateCommand();
+            command.CommandText = "SELECT Id, FileName, StoredFileName, Description, UploadedAt FROM PdfDocument WHERE Id = $id";
+            command.Parameters.AddWithValue("$id", id);
+
+            using var reader = command.ExecuteReader();
+            if (!reader.Read())
+            {
+                return null;
+            }
+
+            return new PdfRecord(
+                reader.GetInt32(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4));
+        }
+    }
+
     public List<PdfRecord> Search(string? query)
     {
         lock (_lock)
