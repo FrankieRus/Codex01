@@ -188,6 +188,9 @@ publish/
 # Local SQLite data (per-environment, not part of source)
 App_Data/
 
+# User-uploaded files (per-environment, not part of source)
+BlazorServerApp/wwwroot/uploads/
+
 # Publish Web Output
 *.[Pp]ublish.xml
 *.azurePubxml

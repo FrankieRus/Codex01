@@ -1,9 +1,209 @@
 @page "/website/site1"
+@implements IDisposable
+@using System.Text
+@using BlazorServerApp.Data
+@inject PdfDocumentStore PdfStore
+@inject IWebHostEnvironment Env
+@inject LayoutState LayoutState
+@inject ILogger<Site1> Logger
 
-<PageTitle>Site 1</PageTitle>
+<PageTitle>PDF Library</PageTitle>
 
-<h1>Site 1</h1>
+@if (selected is not null)
+{
+    <button class="btn btn-secondary btn-sm mb-3" @onclick="BackToList">&larr; Back</button>
+    <h5>@selected.Description</h5>
+    <iframe title="@selected.Description" src="@GetPdfUrl(selected)" style="width:100%; height:85vh; border:1px solid #ccc;"></iframe>
+}
+else
+{
+    <h1>PDF Library</h1>
+    <a href="website" class="btn btn-secondary btn-sm mb-3">Back to Website</a>
 
-<p>This is a placeholder for Site 1.</p>
+    <div class="row">
+        <div class="col-md-5">
+            <h5>Upload a PDF</h5>
+            <div class="mb-2">
+                <label for="pdfFile" class="form-label">PDF file</label>
+                <InputFile id="pdfFile" OnChange="OnFileSelected" accept=".pdf" class="form-control" />
+            </div>
+            <div class="mb-2">
+                <label for="pdfDescription" class="form-label">Description</label>
+                <input id="pdfDescription" class="form-control" placeholder="Description"
+                       value="@description" @oninput="e => description = e.Value?.ToString() ?? string.Empty" />
+            </div>
+            <button class="btn btn-primary" @onclick="UploadAsync" disabled="@(selectedFile is null || uploading)">
+                @(uploading ? "Uploading..." : "Upload")
+            </button>
+            @if (!string.IsNullOrEmpty(uploadError))
+            {
+                <div class="text-danger mt-2">@uploadError</div>
+            }
 
-<a href="website" class="btn btn-secondary">Back to Website</a>
+            <hr />
+
+            <h5>Search</h5>
+            <label for="pdfSearch" class="form-label visually-hidden">Search description or filename</label>
+            <input id="pdfSearch" class="form-control mb-2" placeholder="Search description or filename..."
+                   value="@searchQuery" @oninput="OnSearch" />
+
+            <div class="list-group">
+                @foreach (var doc in documents)
+                {
+                    <button type="button" class="list-group-item list-group-item-action" @onclick="() => Select(doc)">
+                        <strong>@doc.Description</strong><br />
+                        <small>@doc.FileName &mdash; @doc.UploadedAt UTC</small>
+                    </button>
+                }
+                @if (documents.Count == 0)
+                {
+                    <div class="list-group-item text-muted">No PDFs found.</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const long MaxFileSize = 50 * 1024 * 1024; // 50 MB per file
+    private const long MaxTotalStorage = 500 * 1024 * 1024; // 500 MB total across all uploads
+    private static readonly byte[] PdfSignature = Encoding.ASCII.GetBytes("%PDF-");
+
+    private IBrowserFile? selectedFile;
+    private string description = string.Empty;
+    private string searchQuery = string.Empty;
+    private string? uploadError;
+    private bool uploading;
+    private List<PdfRecord> documents = new();
+    private PdfRecord? selected;
+
+    protected override void OnInitialized()
+    {
+        documents = PdfStore.Search(searchQuery);
+    }
+
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        uploadError = null;
+    }
+
+    private async Task UploadAsync()
+    {
+        var fileToUpload = selectedFile;
+        var descriptionToSave = description.Trim();
+
+        if (fileToUpload is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(descriptionToSave))
+        {
+            uploadError = "Please enter a description.";
+            return;
+        }
+
+        if (!fileToUpload.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            uploadError = "Only PDF files are allowed.";
+            return;
+        }
+
+        if (GetUploadsDirSize() + fileToUpload.Size > MaxTotalStorage)
+        {
+            uploadError = "Storage limit reached. Please remove old PDFs before uploading more.";
+            return;
+        }
+
+        uploading = true;
+        uploadError = null;
+
+        var uploadsDir = Path.Combine(Env.WebRootPath, "uploads", "pdfs");
+        Directory.CreateDirectory(uploadsDir);
+        var storedFileName = $"{Guid.NewGuid()}.pdf";
+        var destPath = Path.Combine(uploadsDir, storedFileName);
+
+        try
+        {
+            await using (var stream = fileToUpload.OpenReadStream(MaxFileSize))
+            await using (var fileStream = File.Create(destPath))
+            {
+                var header = new byte[PdfSignature.Length];
+                var read = await stream.ReadAsync(header.AsMemory());
+                if (read < PdfSignature.Length || !header.AsSpan(0, read).SequenceEqual(PdfSignature))
+                {
+                    uploadError = "The selected file is not a valid PDF.";
+                    return;
+                }
+
+                await fileStream.WriteAsync(header.AsMemory(0, read));
+                await stream.CopyToAsync(fileStream);
+            }
+
+            PdfStore.Add(fileToUpload.Name, storedFileName, descriptionToSave);
+
+            if (ReferenceEquals(selectedFile, fileToUpload))
+            {
+                selectedFile = null;
+            }
+
+            if (description.Trim() == descriptionToSave)
+            {
+                description = string.Empty;
+            }
+
+            documents = PdfStore.Search(searchQuery);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to upload PDF {FileName}", fileToUpload.Name);
+            uploadError = "Upload failed. Please try again.";
+        }
+        finally
+        {
+            if (!string.IsNullOrEmpty(uploadError) && File.Exists(destPath))
+            {
+                File.Delete(destPath);
+            }
+
+            uploading = false;
+        }
+    }
+
+    private long GetUploadsDirSize()
+    {
+        var uploadsDir = Path.Combine(Env.WebRootPath, "uploads", "pdfs");
+        if (!Directory.Exists(uploadsDir))
+        {
+            return 0;
+        }
+
+        return new DirectoryInfo(uploadsDir).EnumerateFiles().Sum(f => f.Length);
+    }
+
+    private void OnSearch(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? string.Empty;
+        documents = PdfStore.Search(searchQuery);
+    }
+
+    private void Select(PdfRecord doc)
+    {
+        selected = doc;
+        LayoutState.HideSidebar();
+    }
+
+    private void BackToList()
+    {
+        selected = null;
+        LayoutState.ShowSidebar();
+    }
+
+    private static string GetPdfUrl(PdfRecord doc) => $"/uploads/pdfs/{doc.StoredFileName}";
+
+    public void Dispose()
+    {
+        LayoutState.ShowSidebar();
+    }
+}
