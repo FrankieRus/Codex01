@@ -1,6 +1,8 @@
 using BlazorServerApp.Components;
 using BlazorServerApp.Data;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,7 +32,19 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    // Force PDFs to render inline (e.g. in our <iframe> viewer) instead of
+    // some browsers showing a "click to open" placeholder or downloading them.
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.File.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers[HeaderNames.ContentDisposition] =
+                new ContentDispositionHeaderValue("inline") { FileNameStar = ctx.File.Name }.ToString();
+        }
+    }
+});
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
