@@ -1,5 +1,6 @@
 ﻿@page "/counter"
 @rendermode InteractiveServer
+@inject IJSRuntime JS
 
 <PageTitle>Counter</PageTitle>
 
@@ -10,10 +11,25 @@
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
 
 @code {
+    private const string StorageKey = "counter-value";
     private int currentCount = 0;
 
-    private void IncrementCount()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            if (int.TryParse(stored, out var value))
+            {
+                currentCount = value;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task IncrementCount()
     {
         currentCount++;
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey, currentCount.ToString());
     }
 }
