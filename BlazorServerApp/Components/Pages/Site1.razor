@@ -1,66 +1,63 @@
 @page "/website/site1"
-@rendermode InteractiveServer
+@implements IDisposable
 @using BlazorServerApp.Data
 @inject PdfDocumentStore PdfStore
 @inject IWebHostEnvironment Env
+@inject LayoutState LayoutState
 
 <PageTitle>PDF Library</PageTitle>
 
-<h1>PDF Library</h1>
-<a href="website" class="btn btn-secondary btn-sm mb-3">Back to Website</a>
+@if (selected is not null)
+{
+    <button class="btn btn-secondary btn-sm mb-3" @onclick="BackToList">&larr; Back</button>
+    <h5>@selected.Description</h5>
+    <iframe title="@selected.Description" src="@GetPdfUrl(selected)" style="width:100%; height:85vh; border:1px solid #ccc;"></iframe>
+}
+else
+{
+    <h1>PDF Library</h1>
+    <a href="website" class="btn btn-secondary btn-sm mb-3">Back to Website</a>
 
-<div class="row">
-    <div class="col-md-5">
-        <h5>Upload a PDF</h5>
-        <div class="mb-2">
-            <InputFile OnChange="OnFileSelected" accept=".pdf" class="form-control" />
-        </div>
-        <div class="mb-2">
-            <input class="form-control" placeholder="Description"
-                   value="@description" @oninput="e => description = e.Value?.ToString() ?? string.Empty" />
-        </div>
-        <button class="btn btn-primary" @onclick="UploadAsync" disabled="@(selectedFile is null || uploading)">
-            @(uploading ? "Uploading..." : "Upload")
-        </button>
-        @if (!string.IsNullOrEmpty(uploadError))
-        {
-            <div class="text-danger mt-2">@uploadError</div>
-        }
-
-        <hr />
-
-        <h5>Search</h5>
-        <input class="form-control mb-2" placeholder="Search description or filename..."
-               value="@searchQuery" @oninput="OnSearch" />
-
-        <ul class="list-group">
-            @foreach (var doc in documents)
+    <div class="row">
+        <div class="col-md-5">
+            <h5>Upload a PDF</h5>
+            <div class="mb-2">
+                <InputFile OnChange="OnFileSelected" accept=".pdf" class="form-control" />
+            </div>
+            <div class="mb-2">
+                <input class="form-control" placeholder="Description"
+                       value="@description" @oninput="e => description = e.Value?.ToString() ?? string.Empty" />
+            </div>
+            <button class="btn btn-primary" @onclick="UploadAsync" disabled="@(selectedFile is null || uploading)">
+                @(uploading ? "Uploading..." : "Upload")
+            </button>
+            @if (!string.IsNullOrEmpty(uploadError))
             {
-                <li class="list-group-item @(selected?.Id == doc.Id ? "active" : "")" style="cursor:pointer"
-                    @onclick="() => Select(doc)">
-                    <strong>@doc.Description</strong><br />
-                    <small>@doc.FileName &mdash; @doc.UploadedAt UTC</small>
-                </li>
+                <div class="text-danger mt-2">@uploadError</div>
             }
-            @if (documents.Count == 0)
-            {
-                <li class="list-group-item text-muted">No PDFs found.</li>
-            }
-        </ul>
-    </div>
 
-    <div class="col-md-7">
-        @if (selected is not null)
-        {
-            <h5>@selected.Description</h5>
-            <iframe title="@selected.Description" src="@GetPdfUrl(selected)" style="width:100%; height:80vh; border:1px solid #ccc;"></iframe>
-        }
-        else
-        {
-            <p class="text-muted">Select a PDF from the list to view it here.</p>
-        }
+            <hr />
+
+            <h5>Search</h5>
+            <input class="form-control mb-2" placeholder="Search description or filename..."
+                   value="@searchQuery" @oninput="OnSearch" />
+
+            <ul class="list-group">
+                @foreach (var doc in documents)
+                {
+                    <li class="list-group-item" style="cursor:pointer" @onclick="() => Select(doc)">
+                        <strong>@doc.Description</strong><br />
+                        <small>@doc.FileName &mdash; @doc.UploadedAt UTC</small>
+                    </li>
+                }
+                @if (documents.Count == 0)
+                {
+                    <li class="list-group-item text-muted">No PDFs found.</li>
+                }
+            </ul>
+        </div>
     </div>
-</div>
+}
 
 @code {
     private const long MaxFileSize = 50 * 1024 * 1024; // 50 MB
@@ -143,7 +140,19 @@
     private void Select(PdfRecord doc)
     {
         selected = doc;
+        LayoutState.HideSidebar();
+    }
+
+    private void BackToList()
+    {
+        selected = null;
+        LayoutState.ShowSidebar();
     }
 
     private static string GetPdfUrl(PdfRecord doc) => $"/uploads/pdfs/{doc.StoredFileName}";
+
+    public void Dispose()
+    {
+        LayoutState.ShowSidebar();
+    }
 }

@@ -10,6 +10,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddSingleton<CounterStore>();
 builder.Services.AddSingleton<MemoStore>();
 builder.Services.AddSingleton<PdfDocumentStore>();
+builder.Services.AddScoped<LayoutState>();
 
 // Allow larger PDF uploads to flow over the Blazor Server SignalR circuit.
 builder.Services.Configure<HubOptions>(options =>
