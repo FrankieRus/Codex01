@@ -1,5 +1,6 @@
 @page "/counter"
 @rendermode InteractiveServer
+@implements IDisposable
 @using BlazorServerApp.Data
 @inject CounterStore CounterStore
 
@@ -17,10 +18,25 @@
     protected override void OnInitialized()
     {
         currentCount = CounterStore.GetValue();
+        CounterStore.OnCounterChanged += HandleCounterChanged;
+    }
+
+    private void HandleCounterChanged(int newValue)
+    {
+        InvokeAsync(() =>
+        {
+            currentCount = newValue;
+            StateHasChanged();
+        });
     }
 
     private void IncrementCount()
     {
-        currentCount = CounterStore.Increment();
+        CounterStore.Increment();
+    }
+
+    public void Dispose()
+    {
+        CounterStore.OnCounterChanged -= HandleCounterChanged;
     }
 }
