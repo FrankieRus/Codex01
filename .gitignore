@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Local Claude Code preview launch config
+.claude/
+
 # User-specific files
 *.rsuser
 *.suo

@@ -23,30 +23,41 @@
 else
 {
     <h1>PDF Library</h1>
-    <a href="website" class="btn btn-secondary btn-sm mb-3">Back to Website</a>
+    <div class="d-flex gap-2 mb-3">
+        <a href="website" class="btn btn-secondary btn-sm">Back to Website</a>
+        <button type="button" class="btn btn-primary btn-sm" @onclick="OpenUploadModal">Upload a PDF</button>
+    </div>
+
+    @if (showUploadModal)
+    {
+        <div class="upload-modal-backdrop" @onclick="CloseUploadModal">
+            <div class="upload-modal" @onclick:stopPropagation="true">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="mb-0">Upload a PDF</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseUploadModal"></button>
+                </div>
+                <div class="mb-2">
+                    <label for="pdfFile" class="form-label">PDF file</label>
+                    <InputFile id="pdfFile" OnChange="OnFileSelected" accept=".pdf" class="form-control" />
+                </div>
+                <div class="mb-2">
+                    <label for="pdfDescription" class="form-label">Description</label>
+                    <input id="pdfDescription" class="form-control" placeholder="Description"
+                           value="@description" @oninput="e => description = e.Value?.ToString() ?? string.Empty" />
+                </div>
+                <button class="btn btn-primary" @onclick="UploadAsync" disabled="@(selectedFile is null || uploading)">
+                    @(uploading ? "Uploading..." : "Upload")
+                </button>
+                @if (!string.IsNullOrEmpty(uploadError))
+                {
+                    <div class="text-danger mt-2">@uploadError</div>
+                }
+            </div>
+        </div>
+    }
 
     <div class="row">
-        <div class="col-md-5">
-            <h5>Upload a PDF</h5>
-            <div class="mb-2">
-                <label for="pdfFile" class="form-label">PDF file</label>
-                <InputFile id="pdfFile" OnChange="OnFileSelected" accept=".pdf" class="form-control" />
-            </div>
-            <div class="mb-2">
-                <label for="pdfDescription" class="form-label">Description</label>
-                <input id="pdfDescription" class="form-control" placeholder="Description"
-                       value="@description" @oninput="e => description = e.Value?.ToString() ?? string.Empty" />
-            </div>
-            <button class="btn btn-primary" @onclick="UploadAsync" disabled="@(selectedFile is null || uploading)">
-                @(uploading ? "Uploading..." : "Upload")
-            </button>
-            @if (!string.IsNullOrEmpty(uploadError))
-            {
-                <div class="text-danger mt-2">@uploadError</div>
-            }
-
-            <hr />
-
+        <div class="col-12">
             <h5>Search</h5>
             <label for="pdfSearch" class="form-label visually-hidden">Search description or filename</label>
             <input id="pdfSearch" class="form-control mb-2" placeholder="Search description or filename..."
@@ -55,9 +66,9 @@ else
             <div class="list-group">
                 @foreach (var doc in documents)
                 {
-                    <button type="button" class="list-group-item list-group-item-action" @onclick="() => Select(doc)">
-                        <strong>@doc.Description</strong><br />
-                        <small>@doc.FileName &mdash; @doc.UploadedAt UTC</small>
+                    <button type="button" class="list-group-item list-group-item-action text-truncate" @onclick="() => Select(doc)">
+                        <strong>@doc.Description</strong>
+                        <small>&mdash; @doc.FileName &mdash; @doc.UploadedAt UTC</small>
                     </button>
                 }
                 @if (documents.Count == 0)
@@ -81,6 +92,18 @@ else
     private bool uploading;
     private List<PdfRecord> documents = new();
     private PdfRecord? selected;
+    private bool showUploadModal;
+
+    private void OpenUploadModal()
+    {
+        showUploadModal = true;
+        uploadError = null;
+    }
+
+    private void CloseUploadModal()
+    {
+        showUploadModal = false;
+    }
 
     protected override void OnInitialized()
     {
@@ -159,6 +182,7 @@ else
             }
 
             documents = PdfStore.Search(searchQuery);
+            showUploadModal = false;
 
             var uploaded = PdfStore.GetById(newId);
             if (uploaded is not null)
