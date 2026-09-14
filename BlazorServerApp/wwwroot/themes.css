@@ -1,0 +1,79 @@
+/* Theme variables. Applied via a data-theme attribute on <html>. */
+
+:root,
+html[data-theme="classic"] {
+    --theme-sidebar-from: #052767;
+    --theme-sidebar-to: #3a0647;
+    --theme-topbar-accent: #1b6ec2;
+    --theme-accent: #1b6ec2;
+    --theme-accent-dark: #1861ac;
+    --theme-link: #006bb7;
+    --theme-nav-active: rgba(255, 255, 255, 0.37);
+    --theme-page-bg-from: #eef2f7;
+    --theme-page-bg-to: #ffffff;
+}
+
+html[data-theme="aurora"] {
+    --theme-sidebar-from: #0f2027;
+    --theme-sidebar-to: #2ec4b6;
+    --theme-topbar-accent: #2ec4b6;
+    --theme-accent: #17a398;
+    --theme-accent-dark: #0f7a72;
+    --theme-link: #0f7a72;
+    --theme-nav-active: rgba(46, 196, 182, 0.45);
+    --theme-page-bg-from: #e6fbf8;
+    --theme-page-bg-to: #ffffff;
+}
+
+html[data-theme="sunset"] {
+    --theme-sidebar-from: #ff512f;
+    --theme-sidebar-to: #dd2476;
+    --theme-topbar-accent: #dd2476;
+    --theme-accent: #dd2476;
+    --theme-accent-dark: #b81b5e;
+    --theme-link: #c2185b;
+    --theme-nav-active: rgba(255, 255, 255, 0.35);
+    --theme-page-bg-from: #fff0ec;
+    --theme-page-bg-to: #ffffff;
+}
+
+html[data-theme="ocean"] {
+    --theme-sidebar-from: #005c97;
+    --theme-sidebar-to: #363795;
+    --theme-topbar-accent: #363795;
+    --theme-accent: #1e5fa8;
+    --theme-accent-dark: #16487f;
+    --theme-link: #1e5fa8;
+    --theme-nav-active: rgba(255, 255, 255, 0.35);
+    --theme-page-bg-from: #eaf3ff;
+    --theme-page-bg-to: #ffffff;
+}
+
+html[data-theme="galaxy"] {
+    --theme-sidebar-from: #0f0c29;
+    --theme-sidebar-to: #ff00cc;
+    --theme-topbar-accent: #ff00cc;
+    --theme-accent: #b100e8;
+    --theme-accent-dark: #8a00b3;
+    --theme-link: #b100e8;
+    --theme-nav-active: rgba(255, 0, 204, 0.35);
+    --theme-page-bg-from: #f6ecff;
+    --theme-page-bg-to: #ffffff;
+}
+
+html[data-theme="forest"] {
+    --theme-sidebar-from: #134e5e;
+    --theme-sidebar-to: #71b280;
+    --theme-topbar-accent: #2f9e6a;
+    --theme-accent: #2f9e6a;
+    --theme-accent-dark: #237a52;
+    --theme-link: #237a52;
+    --theme-nav-active: rgba(113, 178, 128, 0.45);
+    --theme-page-bg-from: #eafaf0;
+    --theme-page-bg-to: #ffffff;
+}
+
+body {
+    background: linear-gradient(180deg, var(--theme-page-bg-from) 0%, var(--theme-page-bg-to) 320px);
+    min-height: 100vh;
+}

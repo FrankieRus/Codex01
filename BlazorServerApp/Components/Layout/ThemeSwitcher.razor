@@ -1,0 +1,63 @@
+@implements IDisposable
+@using BlazorServerApp.Data
+@inject ThemeStore ThemeStore
+@inject IJSRuntime JS
+
+<div class="theme-switcher px-3">
+    <div class="theme-switcher-label">Theme</div>
+    <div class="theme-swatches">
+        @foreach (var theme in ThemeStore.Themes)
+        {
+            <button type="button"
+                    class="theme-swatch @(theme.Id == currentThemeId ? "active" : "")"
+                    title="@theme.Name"
+                    style="background-image: linear-gradient(135deg, @theme.SwatchFrom, @theme.SwatchTo)"
+                    @onclick="() => SelectTheme(theme.Id)">
+                <span class="visually-hidden">@theme.Name</span>
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    private string currentThemeId = "classic";
+
+    protected override void OnInitialized()
+    {
+        currentThemeId = ThemeStore.GetCurrentThemeId();
+        ThemeStore.OnThemeChanged += HandleThemeChanged;
+    }
+
+    private async Task SelectTheme(string themeId)
+    {
+        ThemeStore.SetTheme(themeId);
+        await ApplyThemeAsync(themeId);
+    }
+
+    private void HandleThemeChanged(string themeId)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            currentThemeId = themeId;
+            StateHasChanged();
+            await ApplyThemeAsync(themeId);
+        });
+    }
+
+    private async Task ApplyThemeAsync(string themeId)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("blazorTheme.apply", themeId);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit is going away; nothing to do.
+        }
+    }
+
+    public void Dispose()
+    {
+        ThemeStore.OnThemeChanged -= HandleThemeChanged;
+    }
+}
