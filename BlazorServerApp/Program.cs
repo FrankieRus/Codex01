@@ -13,6 +13,7 @@ builder.Services.AddSingleton<CounterStore>();
 builder.Services.AddSingleton<MemoStore>();
 builder.Services.AddSingleton<PdfDocumentStore>();
 builder.Services.AddSingleton<ThemeStore>();
+builder.Services.AddScoped<DatabaseAdminService>();
 builder.Services.AddScoped<LayoutState>();
 
 // Allow larger PDF uploads to flow over the Blazor Server SignalR circuit.

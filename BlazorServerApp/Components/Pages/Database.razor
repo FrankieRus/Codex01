@@ -1,0 +1,278 @@
+@page "/database"
+@using BlazorServerApp.Data
+@inject DatabaseAdminService Db
+@inject IJSRuntime JS
+
+<PageTitle>Database</PageTitle>
+
+<h1>Database</h1>
+<p class="text-muted">View and maintain the app's SQLite database (App_Data/counter.db).</p>
+
+<div class="row">
+    <div class="col-md-3">
+        <h5>Tables</h5>
+        <div class="list-group mb-3">
+            @foreach (var table in tables)
+            {
+                <button type="button"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(table.Name == selectedTable ? "active" : "")"
+                        @onclick="() => SelectTable(table.Name)">
+                    @table.Name
+                    <span class="badge bg-secondary rounded-pill">@table.RowCount</span>
+                </button>
+            }
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="RefreshAll">Refresh</button>
+    </div>
+
+    <div class="col-md-9">
+        @if (selectedTable is not null)
+        {
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">@selectedTable <small class="text-muted">(showing up to @RowLimit rows, newest first)</small></h5>
+            </div>
+
+            @if (rowLoadError is not null)
+            {
+                <div class="text-danger">@rowLoadError</div>
+            }
+            else if (columns.Count == 0)
+            {
+                <div class="text-muted">This table has no columns.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle">
+                        <thead>
+                            <tr>
+                                <th>rowid</th>
+                                @foreach (var col in columns)
+                                {
+                                    <th>@col</th>
+                                }
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in rows)
+                            {
+                                <tr>
+                                    <td class="text-muted">@row.RowId</td>
+                                    @if (editingRowId == row.RowId)
+                                    {
+                                        @for (var i = 0; i < columns.Count; i++)
+                                        {
+                                            var col = columns[i];
+                                            <td>
+                                                <input class="form-control form-control-sm"
+                                                       value="@GetEditValue(col)"
+                                                       @oninput="e => editValues[col] = e.Value?.ToString() ?? string.Empty" />
+                                            </td>
+                                        }
+                                        <td class="text-nowrap">
+                                            <button class="btn btn-success btn-sm" @onclick="() => SaveRow(row.RowId)">Save</button>
+                                            <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">Cancel</button>
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var value in row.Values)
+                                        {
+                                            <td class="text-truncate" style="max-width: 240px;">@(value?.ToString() ?? "NULL")</td>
+                                        }
+                                        <td class="text-nowrap">
+                                            <button class="btn btn-outline-primary btn-sm" @onclick="() => StartEdit(row.RowId, row.Values)">Edit</button>
+                                            <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteRow(row.RowId)">Delete</button>
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                            @if (rows.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="@(columns.Count + 2)" class="text-muted">No rows.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="text-muted">Select a table on the left to view its rows.</div>
+        }
+
+        <hr />
+
+        <h5>SQL query</h5>
+        <p class="text-muted">Runs directly against the database. Use with care &mdash; there is no undo.</p>
+        <textarea class="form-control mb-2" rows="3" placeholder="SELECT * FROM Counter" @bind="sqlInput"></textarea>
+        <button class="btn btn-primary btn-sm mb-3" @onclick="RunSql">Run</button>
+
+        @if (sqlResult is not null)
+        {
+            @if (sqlResult.Error is not null)
+            {
+                <div class="text-danger">@sqlResult.Error</div>
+            }
+            else if (sqlResult.RowsAffected is not null)
+            {
+                <div class="text-success">@sqlResult.RowsAffected row(s) affected.</div>
+            }
+            else if (sqlResult.Columns is not null)
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                @foreach (var col in sqlResult.Columns)
+                                {
+                                    <th>@col</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in sqlResult.Rows!)
+                            {
+                                <tr>
+                                    @foreach (var value in row)
+                                    {
+                                        <td>@(value?.ToString() ?? "NULL")</td>
+                                    }
+                                </tr>
+                            }
+                            @if (sqlResult.Rows!.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="@sqlResult.Columns.Count" class="text-muted">No rows.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private const int RowLimit = 200;
+
+    private List<TableInfo> tables = new();
+    private string? selectedTable;
+    private List<string> columns = new();
+    private List<(long RowId, object?[] Values)> rows = new();
+    private string? rowLoadError;
+
+    private long? editingRowId;
+    private Dictionary<string, string> editValues = new();
+
+    private string sqlInput = string.Empty;
+    private SqlResult? sqlResult;
+
+    protected override void OnInitialized()
+    {
+        tables = Db.ListTables();
+    }
+
+    private void RefreshAll()
+    {
+        tables = Db.ListTables();
+        if (selectedTable is not null)
+        {
+            LoadRows(selectedTable);
+        }
+    }
+
+    private void SelectTable(string name)
+    {
+        selectedTable = name;
+        CancelEdit();
+        LoadRows(name);
+    }
+
+    private void LoadRows(string name)
+    {
+        rowLoadError = null;
+        try
+        {
+            (columns, rows) = Db.GetRows(name, RowLimit);
+        }
+        catch (Exception ex)
+        {
+            columns = new();
+            rows = new();
+            rowLoadError = ex.Message;
+        }
+    }
+
+    private void StartEdit(long rowId, object?[] values)
+    {
+        editingRowId = rowId;
+        editValues = new Dictionary<string, string>();
+        for (var i = 0; i < columns.Count; i++)
+        {
+            editValues[columns[i]] = values[i]?.ToString() ?? string.Empty;
+        }
+    }
+
+    private string GetEditValue(string column) =>
+        editValues.TryGetValue(column, out var value) ? value : string.Empty;
+
+    private void CancelEdit()
+    {
+        editingRowId = null;
+        editValues = new();
+    }
+
+    private void SaveRow(long rowId)
+    {
+        if (selectedTable is null)
+        {
+            return;
+        }
+
+        foreach (var (column, value) in editValues)
+        {
+            Db.UpdateCell(selectedTable, rowId, column, value);
+        }
+
+        CancelEdit();
+        LoadRows(selectedTable);
+    }
+
+    private async Task DeleteRow(long rowId)
+    {
+        if (selectedTable is null)
+        {
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Delete row {rowId} from {selectedTable}?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        Db.DeleteRow(selectedTable, rowId);
+        LoadRows(selectedTable);
+        tables = Db.ListTables();
+    }
+
+    private void RunSql()
+    {
+        if (string.IsNullOrWhiteSpace(sqlInput))
+        {
+            return;
+        }
+
+        sqlResult = Db.RunQuery(sqlInput);
+        tables = Db.ListTables();
+        if (selectedTable is not null)
+        {
+            LoadRows(selectedTable);
+        }
+    }
+}
