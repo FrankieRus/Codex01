@@ -81,8 +81,8 @@ else
 }
 
 @code {
-    private const long MaxFileSize = 50 * 1024 * 1024; // 50 MB per file
-    private const long MaxTotalStorage = 500 * 1024 * 1024; // 500 MB total across all uploads
+    private const long MaxFileSize = 100 * 1024 * 1024; // 100 MB per file
+    private const long MaxTotalStorage = 1024L * 1024 * 1024; // 1 GB total across all uploads
     private static readonly byte[] PdfSignature = Encoding.ASCII.GetBytes("%PDF-");
 
     private IBrowserFile? selectedFile;
@@ -190,10 +190,15 @@ else
                 Select(uploaded);
             }
         }
+        catch (IOException ex) when (ex.Message.Contains("exceeds", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.LogWarning(ex, "PDF upload rejected as too large: {FileName} ({Size} bytes)", fileToUpload.Name, fileToUpload.Size);
+            uploadError = $"This file is too large ({fileToUpload.Size / 1024 / 1024} MB). The limit is {MaxFileSize / 1024 / 1024} MB.";
+        }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to upload PDF {FileName}", fileToUpload.Name);
-            uploadError = "Upload failed. Please try again.";
+            Logger.LogError(ex, "Failed to upload PDF {FileName} ({Size} bytes)", fileToUpload.Name, fileToUpload.Size);
+            uploadError = $"Upload failed: {ex.Message}";
         }
         finally
         {

@@ -19,7 +19,7 @@ builder.Services.AddScoped<LayoutState>();
 // Allow larger PDF uploads to flow over the Blazor Server SignalR circuit.
 builder.Services.Configure<HubOptions>(options =>
 {
-    options.MaximumReceiveMessageSize = 50 * 1024 * 1024; // 50 MB
+    options.MaximumReceiveMessageSize = 100 * 1024 * 1024; // 100 MB
 });
 
 var app = builder.Build();
