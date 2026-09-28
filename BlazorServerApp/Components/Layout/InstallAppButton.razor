@@ -1,0 +1,98 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@if (showButton)
+{
+    <button type="button" class="install-app-button" @onclick="OnClick">
+        <span aria-hidden="true">⬇</span> Install app
+    </button>
+}
+
+@if (showIosInstructions)
+{
+    <div class="install-app-ios-tip" role="dialog" aria-label="Installatie-instructies">
+        <p>
+            Tik op <strong>Deel</strong> <span aria-hidden="true">⏏</span> onderaan Safari en kies
+            <strong>"Zet op beginscherm"</strong> ("Add to Home Screen") om deze app te installeren.
+        </p>
+        <button type="button" class="install-app-ios-tip-close" @onclick="() => showIosInstructions = false">
+            Sluiten
+        </button>
+    </div>
+}
+
+@code {
+    private DotNetObjectReference<InstallAppButton>? selfRef;
+    private bool canPrompt;
+    private bool isIos;
+    private bool isStandalone;
+    private bool showIosInstructions;
+
+    private bool showButton => !isStandalone && (canPrompt || isIos);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        selfRef = DotNetObjectReference.Create(this);
+
+        try
+        {
+            await JS.InvokeVoidAsync("pwaInstall.registerServiceWorker");
+            var state = await JS.InvokeAsync<InstallState>("pwaInstall.init", selfRef);
+            canPrompt = state.CanPrompt;
+            isIos = state.IsIos;
+            isStandalone = state.IsStandalone;
+            StateHasChanged();
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit is going away; nothing to do.
+        }
+    }
+
+    private async Task OnClick()
+    {
+        if (isIos)
+        {
+            showIosInstructions = true;
+            return;
+        }
+
+        try
+        {
+            var outcome = await JS.InvokeAsync<string>("pwaInstall.promptInstall");
+            if (outcome == "accepted")
+            {
+                canPrompt = false;
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Circuit is going away; nothing to do.
+        }
+    }
+
+    [JSInvokable]
+    public void OnInstallAvailabilityChanged(bool available)
+    {
+        canPrompt = available;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        selfRef?.Dispose();
+        await Task.CompletedTask;
+    }
+
+    private sealed class InstallState
+    {
+        public bool CanPrompt { get; set; }
+        public bool IsIos { get; set; }
+        public bool IsStandalone { get; set; }
+    }
+}
