@@ -36,6 +36,7 @@ app.UseHttpsRedirection();
 
 var staticFileContentTypeProvider = new FileExtensionContentTypeProvider();
 staticFileContentTypeProvider.Mappings[".ftl"] = "text/plain"; // pdf.js viewer localization files
+staticFileContentTypeProvider.Mappings[".webmanifest"] = "application/manifest+json"; // PWA manifest
 
 app.UseStaticFiles(new StaticFileOptions
 {
