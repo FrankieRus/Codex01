@@ -13,6 +13,10 @@ const APP_SHELL = [
   '/app.css',
   '/themes.css',
   '/favicon.png',
+  '/apple-touch-icon.png',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-512-maskable.png',
   '/manifest.webmanifest'
 ];
 
